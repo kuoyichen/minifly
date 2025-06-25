@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
-  <title>响应式离线油门＋倾斜示例（半长滑杆）</title>
+  <title>响应式离线油门＋倾斜示例（滑杆紧贴油门文字）</title>
   <style>
     :root {
       /* 滑杆宽度占视口宽度的 8% */
@@ -29,9 +29,8 @@
     #tiltValue    { right: 1rem; }
     #slider {
       position: absolute;
-      /* 滑杆从顶端到屏幕中心 */
-      top: 0;
-      bottom: 50vh;
+      /* top 由 JS 动态设置，紧贴油门文字底部 */
+      bottom: 50vh;      /* 底部仍在屏幕中心 */
       left: 50%;
       width: var(--slider-w);
       margin-left: calc(var(--slider-w) / -2);
@@ -70,15 +69,23 @@
       let isUnlocked = false;
       let longPressTimer = null;
 
-      // 重新计算滑杆可动范围（半屏高度）
+      // 计算并设置 slider 的 top，使其紧贴油门文字底部
+      function updateSliderTop(){
+        const rect = tv.getBoundingClientRect();
+        slider.style.top = rect.bottom + 'px';
+      }
+
+      // 重新计算滑杆可动范围
       function updateBounds(){
+        updateSliderTop();
         const r = slider.getBoundingClientRect();
         minY = r.top;
         maxY = r.bottom;
       }
+
       window.addEventListener('resize', updateBounds);
       window.addEventListener('orientationchange', updateBounds);
-      updateBounds();
+      window.addEventListener('DOMContentLoaded', updateBounds);
 
       // 设置 thumb 位置并更新油门值
       function setThumbByY(y){
@@ -90,7 +97,11 @@
       }
 
       // 初始放到底部（1000）
-      setThumbByY(maxY);
+      // 等待 bounds 计算完再定位
+      window.addEventListener('load', () => {
+        updateBounds();
+        setThumbByY(maxY);
+      });
 
       // 长按 2s 解锁滑动：变绿
       function startLongPress(){
