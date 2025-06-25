@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
-  <title>响应式离线油门＋倾斜示例（留白滑杆）</title>
+  <title>响应式离线油门＋倾斜示例（带 Connect 按钮）</title>
   <style>
     :root {
       /* 滑杆宽度占视口宽度的 8% */
@@ -29,9 +29,27 @@
     #throttleValue { left: 1rem; }
     #tiltValue    { right: 1rem; }
 
+    /* Connect 按钮 */
+    #connectBtn {
+      position: absolute;
+      top: 3rem;        /* 在油门文字下方留出空间 */
+      left: 1rem;
+      padding: 0.5rem 1rem;
+      font-size: 1em;
+      background: #007bff;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      user-select: none;
+    }
+    #connectBtn:active {
+      background: #0056b3;
+    }
+
+    /* 滑杆 */
     #slider {
       position: absolute;
-      top: 4rem;       /* 与页面顶端留空白 */
+      top: 4rem;       /* 与页面顶端留白，并在按钮下方 */
       bottom: 50vh;    /* 底部在屏幕中间 */
       left: 50%;
       width: var(--slider-w);
@@ -41,6 +59,8 @@
       box-sizing: border-box;
       background: rgba(0,0,0,0.03);
     }
+
+    /* 滑块 */
     #thumb {
       position: absolute;
       left: 50%;
@@ -57,6 +77,7 @@
 </head>
 <body>
   <div id="throttleValue">Throttle: 1000</div>
+  <button id="connectBtn">connect</button>
   <div id="tiltValue">Tilt: 0°</div>
   <div id="slider"><div id="thumb"></div></div>
 
@@ -66,10 +87,16 @@
       const thumb  = document.getElementById('thumb');
       const tv     = document.getElementById('throttleValue');
       const ov     = document.getElementById('tiltValue');
+      const btn    = document.getElementById('connectBtn');
 
       let minY, maxY;
       let isUnlocked = false;
       let longPressTimer = null;
+
+      // 打开 Android Wi-Fi 设置页面（Chrome 支持 Intent URI）
+      btn.addEventListener('click', () => {
+        window.location.href = 'intent://settings#Intent;action=android.settings.WIFI_SETTINGS;end';
+      });
 
       // 重新计算滑杆可动范围
       function updateBounds(){
