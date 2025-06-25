@@ -1,138 +1,139 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1.0">
-  <title>离线油门＋倾斜＋Connect Intent</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>油門＋連線按鈕示例</title>
   <style>
     :root {
-      --slider-w: 8vw;                         /* 滑杆宽度 */
-      --thumb-d: calc(var(--slider-w) * 3);   /* 红点直径为滑杆的 3 倍 */
+      --slider-w: 8vw;                 /* 滑杆宽度 */
+      --thumb-d: calc(var(--slider-w)*3); /* 红点直径=滑杆×3 */
     }
     html, body {
       margin: 0; padding: 0;
-      width: 100%; height: 100%;
-      overflow: hidden; touch-action: none;
-      background: #fff; font-family: sans-serif;
+      width:100%; height:100%;
+      overflow:hidden; touch-action:none;
+      font-family:sans-serif; background:#fff;
     }
     #throttleValue, #tiltValue {
-      position: absolute; top: 1rem;
-      font-size: 1.2em; user-select: none;
+      position:absolute; top:1rem;
+      font-size:1.2em; user-select:none;
     }
-    #throttleValue { left: 1rem; }
-    #tiltValue    { right: 1rem; }
+    #throttleValue { left:1rem; }
+    #tiltValue    { right:1rem; }
 
     /* 把 <a> 当成按钮 */
     #connectLink {
-      position: absolute;
-      top: 3rem; left: 1rem;
-      display: inline-block;
-      padding: 0.5rem 1rem;
-      background: #007bff;
-      color: #fff;
-      border-radius: 4px;
-      text-decoration: none;
-      font-size: 1em;
-      user-select: none;
+      position:absolute;
+      top:3rem; left:1rem;
+      padding:0.5rem 1rem;
+      background:#007bff; color:#fff;
+      border-radius:4px;
+      text-decoration:none; font-size:1em;
+      user-select:none;
     }
-    #connectLink:active { background: #0056b3; }
+    #connectLink:active { background:#0056b3; }
 
     #slider {
-      position: absolute;
-      top: 4rem;       /* 与页面顶端留白 */
-      bottom: 50vh;    /* 底部在视口中线 */
-      left: 50%;
-      width: var(--slider-w);
-      margin-left: calc(var(--slider-w) / -2);
-      border: 2px solid #333; border-radius: 4px;
-      box-sizing: border-box;
-      background: rgba(0,0,0,0.03);
+      position:absolute;
+      top:4rem;       /* 顶部留空，紧贴按钮下方 */
+      bottom:50vh;    /* 底部在屏幕中线 */
+      left:50%;
+      width:var(--slider-w);
+      margin-left: calc(var(--slider-w)/-2);
+      border:2px solid #333; border-radius:4px;
+      background:rgba(0,0,0,0.03); box-sizing:border-box;
     }
     #thumb {
-      position: absolute;
-      left: 50%;
-      width: var(--thumb-d);
-      height: var(--thumb-d);
+      position:absolute; left:50%;
+      width:var(--thumb-d); height:var(--thumb-d);
       margin-left: calc(var(--thumb-d)/-2);
-      margin-top: calc(var(--thumb-d)/-2);
-      background: red;           /* 等待态红 */
-      border-radius: 50%;
-      touch-action: none;
-      transition: background 0.2s;
+      margin-top:  calc(var(--thumb-d)/-2);
+      background:red; border-radius:50%;
+      touch-action:none; transition:background .2s;
     }
   </style>
 </head>
 <body>
   <div id="throttleValue">Throttle: 1000</div>
-  <!-- 必须用 Intent URI 放在 href 里才能在 Chrome Android 里打开系统设置 :contentReference[oaicite:0]{index=0} -->
+  <!-- 只指定 action，不带 package，Chrome Android 才能匹配（若系统允许） :contentReference[oaicite:0]{index=0} -->
   <a
     id="connectLink"
-    href="intent://settings/#Intent;action=android.settings.WIFI_SETTINGS;package=com.android.settings;end"
+    href="intent://#Intent;action=android.settings.WIFI_SETTINGS;end"
   >connect</a>
   <div id="tiltValue">Tilt: 0°</div>
   <div id="slider"><div id="thumb"></div></div>
 
   <script>
-    (function(){
-      const slider = document.getElementById('slider');
-      const thumb  = document.getElementById('thumb');
-      const tv     = document.getElementById('throttleValue');
-      const ov     = document.getElementById('tiltValue');
+  (function(){
+    const slider = document.getElementById('slider');
+    const thumb  = document.getElementById('thumb');
+    const tv     = document.getElementById('throttleValue');
+    const ov     = document.getElementById('tiltValue');
 
-      let minY, maxY, isUnlocked=false, longPressTimer;
+    let minY, maxY, isUnlocked=false, longPressTimer;
 
-      function updateBounds(){
-        const r=slider.getBoundingClientRect();
-        minY=r.top; maxY=r.bottom;
+    function updateBounds(){
+      const r = slider.getBoundingClientRect();
+      minY = r.top; maxY = r.bottom;
+    }
+    window.addEventListener('resize', updateBounds);
+    window.addEventListener('orientationchange', updateBounds);
+    window.addEventListener('DOMContentLoaded', updateBounds);
+
+    function setThumbByY(y){
+      y = Math.max(minY, Math.min(maxY, y));
+      thumb.style.top = (y-minY)+'px';
+      const norm = 1 - ((y-minY)/(maxY-minY));
+      const throttle = Math.round(1000 + norm*1000);
+      tv.textContent = 'Throttle: '+throttle;
+    }
+    window.addEventListener('load', ()=>{
+      updateBounds();
+      setThumbByY(maxY);
+    });
+
+    function startLongPress(){
+      clearTimeout(longPressTimer);
+      longPressTimer = setTimeout(()=>{
+        isUnlocked = true;
+        thumb.style.background = 'green';
+      }, 2000);
+    }
+    function cancelLongPress(){
+      clearTimeout(longPressTimer);
+    }
+
+    thumb.addEventListener('touchstart', e=>{
+      e.preventDefault(); startLongPress();
+    },{passive:false});
+    thumb.addEventListener('touchmove', e=>{
+      e.preventDefault();
+      if(isUnlocked) setThumbByY(e.touches[0].clientY);
+    },{passive:false});
+    thumb.addEventListener('touchend', cancelLongPress);
+
+    thumb.addEventListener('mousedown', e=>{
+      e.preventDefault(); startLongPress();
+      function onMove(ev){ if(isUnlocked) setThumbByY(ev.clientY); }
+      function onUp(){
+        cancelLongPress();
+        document.removeEventListener('mousemove',onMove);
+        document.removeEventListener('mouseup',onUp);
       }
-      window.addEventListener('resize', updateBounds);
-      window.addEventListener('orientationchange', updateBounds);
-      window.addEventListener('DOMContentLoaded', updateBounds);
+      document.addEventListener('mousemove',onMove);
+      document.addEventListener('mouseup',onUp);
+    });
 
-      function setThumbByY(y){
-        y=Math.max(minY, Math.min(maxY, y));
-        thumb.style.top=(y-minY)+'px';
-        const norm=1-((y-minY)/(maxY-minY));
-        const throttle=Math.round(1000+norm*1000);
-        tv.textContent='Throttle: '+throttle;
-      }
-
-      window.addEventListener('load',()=>{
-        updateBounds();
-        setThumbByY(maxY);
+    if(window.DeviceOrientationEvent){
+      window.addEventListener('deviceorientation', ev=>{
+        const tilt = ev.gamma||0;
+        ov.textContent = 'Tilt: '+tilt.toFixed(0)+'°';
       });
-
-      function startLongPress(){
-        clearTimeout(longPressTimer);
-        longPressTimer=setTimeout(()=>{
-          isUnlocked=true;
-          thumb.style.background='green';
-        },2000);
-      }
-      function cancelLongPress(){ clearTimeout(longPressTimer); }
-
-      thumb.addEventListener('touchstart',e=>{e.preventDefault();startLongPress();},{passive:false});
-      thumb.addEventListener('touchmove',e=>{
-        e.preventDefault();
-        if(isUnlocked) setThumbByY(e.touches[0].clientY);
-      },{passive:false});
-      thumb.addEventListener('touchend',cancelLongPress);
-
-      thumb.addEventListener('mousedown',e=>{
-        e.preventDefault(); startLongPress();
-        function onMove(ev){ if(isUnlocked) setThumbByY(ev.clientY); }
-        function onUp(){ cancelLongPress(); document.removeEventListener('mousemove',onMove); document.removeEventListener('mouseup',onUp); }
-        document.addEventListener('mousemove',onMove);
-        document.addEventListener('mouseup', onUp);
-      });
-
-      if(window.DeviceOrientationEvent){
-        window.addEventListener('deviceorientation',ev=>{
-          const tilt=ev.gamma||0;
-          ov.textContent='Tilt: '+tilt.toFixed(0)+'°';
-        });
-      } else ov.textContent='Tilt: (不支援)';
-    })();
+    } else {
+      ov.textContent = 'Tilt: (不支援)';
+    }
+  })();
   </script>
 </body>
 </html>
