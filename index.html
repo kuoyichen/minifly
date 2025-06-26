@@ -1,16 +1,16 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>油門＋連線按鈕示例</title>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>油門＋傾斜＋HTTP 控制</title>
   <style>
     :root {
-      --slider-w: 8vw;                 /* 滑杆宽度 */
-      --thumb-d: calc(var(--slider-w)*3); /* 红点直径=滑杆×3 */
+      --slider-w: 8vw;                       /* 滑杆宽度 */
+      --thumb-d: calc(var(--slider-w) * 3); /* 红点直径×3 */
     }
     html, body {
-      margin: 0; padding: 0;
+      margin:0; padding:0;
       width:100%; height:100%;
       overflow:hidden; touch-action:none;
       font-family:sans-serif; background:#fff;
@@ -22,33 +22,33 @@
     #throttleValue { left:1rem; }
     #tiltValue    { right:1rem; }
 
-    /* 把 <a> 当成按钮 */
-    #connectLink {
+    /* Connect 按钮 */
+    #connectBtn {
       position:absolute;
       top:3rem; left:1rem;
-      padding:0.5rem 1rem;
+      padding:.5rem 1rem;
+      border:none; border-radius:4px;
       background:#007bff; color:#fff;
-      border-radius:4px;
-      text-decoration:none; font-size:1em;
-      user-select:none;
+      font-size:1em; user-select:none;
     }
-    #connectLink:active { background:#0056b3; }
+    #connectBtn:active { background:#0056b3; }
 
+    /* 滑杆 */
     #slider {
       position:absolute;
-      top:4rem;       /* 顶部留空，紧贴按钮下方 */
+      top:4rem;       /* 留白到按钮下 */
       bottom:50vh;    /* 底部在屏幕中线 */
       left:50%;
       width:var(--slider-w);
-      margin-left: calc(var(--slider-w)/-2);
+      margin-left:calc(var(--slider-w)/-2);
       border:2px solid #333; border-radius:4px;
       background:rgba(0,0,0,0.03); box-sizing:border-box;
     }
     #thumb {
       position:absolute; left:50%;
       width:var(--thumb-d); height:var(--thumb-d);
-      margin-left: calc(var(--thumb-d)/-2);
-      margin-top:  calc(var(--thumb-d)/-2);
+      margin-left:calc(var(--thumb-d)/-2);
+      margin-top:calc(var(--thumb-d)/-2);
       background:red; border-radius:50%;
       touch-action:none; transition:background .2s;
     }
@@ -56,83 +56,114 @@
 </head>
 <body>
   <div id="throttleValue">Throttle: 1000</div>
-  <!-- 只指定 action，不带 package，Chrome Android 才能匹配（若系统允许） :contentReference[oaicite:0]{index=0} -->
-  <a
-    id="connectLink"
-    href="intent://#Intent;action=android.settings.WIFI_SETTINGS;end"
-  >connect</a>
+  <button id="connectBtn">connect</button>
   <div id="tiltValue">Tilt: 0°</div>
   <div id="slider"><div id="thumb"></div></div>
 
   <script>
-  (function(){
-    const slider = document.getElementById('slider');
-    const thumb  = document.getElementById('thumb');
-    const tv     = document.getElementById('throttleValue');
-    const ov     = document.getElementById('tiltValue');
+  (()=>{
+    const TV = document.getElementById('throttleValue');
+    const OV = document.getElementById('tiltValue');
+    const BTN= document.getElementById('connectBtn');
+    const SL = document.getElementById('slider');
+    const TH = document.getElementById('thumb');
 
-    let minY, maxY, isUnlocked=false, longPressTimer;
+    let minY, maxY;
+    let isUnlocked = false;
+    let longPressTimer;
 
+    // 重新算滑杆范围
     function updateBounds(){
-      const r = slider.getBoundingClientRect();
+      const r = SL.getBoundingClientRect();
       minY = r.top; maxY = r.bottom;
     }
     window.addEventListener('resize', updateBounds);
     window.addEventListener('orientationchange', updateBounds);
     window.addEventListener('DOMContentLoaded', updateBounds);
 
+    // map 函数
+    function map(v, inMin, inMax, outMin, outMax){
+      return (v - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
+    }
+
+    // 计算并设置 thumb 位置 + 显示油门
     function setThumbByY(y){
       y = Math.max(minY, Math.min(maxY, y));
-      thumb.style.top = (y-minY)+'px';
-      const norm = 1 - ((y-minY)/(maxY-minY));
-      const throttle = Math.round(1000 + norm*1000);
-      tv.textContent = 'Throttle: '+throttle;
+      TH.style.top = (y - minY) + 'px';
+      const norm = 1 - ((y - minY) / (maxY - minY));
+      const throttle = Math.round(map(norm, 0,1, 1000,2000));
+      TV.textContent = 'Throttle: '+throttle;
+      sendControl(currentRudder(), throttle);
     }
-    window.addEventListener('load', ()=>{
+
+    // 设备倾斜映射到舵机：-90~+90 → 1000~2000
+    let lastTilt=0;
+    function currentRudder(){
+      // lastTilt in °, -90~90
+      return Math.round(map(Math.min(90, Math.max(-90, lastTilt)), -90,90, 1000,2000));
+    }
+
+    // 发控制命令到 ESP32 HTTP 接口
+    function sendControl(rudder, throttle){
+      const rs = String(rudder).padStart(4,'0');
+      const ts = String(throttle).padStart(4,'0');
+      const msg = 'SRV'+rs+ts+'#';
+      fetch(`http://10.10.10.1/control?data=${encodeURIComponent(msg)}`)
+        .catch(console.error);
+    }
+
+    // 初始化：thumb 底部
+    window.addEventListener('load',()=>{
       updateBounds();
       setThumbByY(maxY);
     });
 
+    // 长按解锁
     function startLongPress(){
       clearTimeout(longPressTimer);
       longPressTimer = setTimeout(()=>{
         isUnlocked = true;
-        thumb.style.background = 'green';
-      }, 2000);
+        TH.style.background = 'green';
+      },2000);
     }
     function cancelLongPress(){
       clearTimeout(longPressTimer);
     }
 
-    thumb.addEventListener('touchstart', e=>{
-      e.preventDefault(); startLongPress();
-    },{passive:false});
-    thumb.addEventListener('touchmove', e=>{
+    // Touch 事件
+    TH.addEventListener('touchstart',e=>{ e.preventDefault(); startLongPress(); },{passive:false});
+    TH.addEventListener('touchmove', e=>{ 
       e.preventDefault();
       if(isUnlocked) setThumbByY(e.touches[0].clientY);
     },{passive:false});
-    thumb.addEventListener('touchend', cancelLongPress);
+    TH.addEventListener('touchend',cancelLongPress);
 
-    thumb.addEventListener('mousedown', e=>{
+    // Mouse 事件（调试）
+    TH.addEventListener('mousedown', e=>{
       e.preventDefault(); startLongPress();
       function onMove(ev){ if(isUnlocked) setThumbByY(ev.clientY); }
-      function onUp(){
-        cancelLongPress();
-        document.removeEventListener('mousemove',onMove);
-        document.removeEventListener('mouseup',onUp);
-      }
+      function onUp(){ cancelLongPress(); document.removeEventListener('mousemove',onMove); document.removeEventListener('mouseup',onUp);}
       document.addEventListener('mousemove',onMove);
       document.addEventListener('mouseup',onUp);
     });
 
+    // 倾斜感应
     if(window.DeviceOrientationEvent){
       window.addEventListener('deviceorientation', ev=>{
-        const tilt = ev.gamma||0;
-        ov.textContent = 'Tilt: '+tilt.toFixed(0)+'°';
+        lastTilt = ev.gamma||0;
+        OV.textContent = 'Tilt: '+ lastTilt.toFixed(0)+'°';
+        // 每次 tilt 变化也立刻发一次
+        const throttle = Number(TV.textContent.split(' ')[1]);
+        sendControl(currentRudder(), throttle);
       });
     } else {
-      ov.textContent = 'Tilt: (不支援)';
+      OV.textContent = 'Tilt: (不支援)';
     }
+
+    // connect 按钮：先让用户连接到 ESP32 AP
+    BTN.addEventListener('click', ()=>{
+      alert('請先進入系統 Wi-Fi 設定，連上 SSID "Minifly"（無密碼），再回到此頁。');
+    });
   })();
   </script>
 </body>
