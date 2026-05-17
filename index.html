@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MiniFly 模擬器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #87CEEB;
+            font-family: sans-serif;
+            touch-action: none;
+        }
+        
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+        }
+
+        #ui-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: rgba(240, 249, 255, 0.95);
+            z-index: 30;
+        }
+
+        #controls-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 5;
+            display: none;
+            pointer-events: none;
+        }
+
+        .joystick-base {
+            position: absolute;
+            bottom: 40px; 
+            width: 150px;
+            height: 150px;
+            border: 2px solid #333;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.05);
+            pointer-events: auto;
+            touch-action: none;
+        }
+
+        .joystick-knob {
+            position: absolute;
+            width: 45px;
+            height: 45px;
+            background: #333;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+
+        #joystick-left { left: 40px; }
+        #knob-left { left: 50%; top: 100%; }
+        #joystick-right { right: 40px; }
+        #knob-right { left: 50%; top: 50%; }
+
+        @media (max-width: 800px) and (orientation: landscape) {
+            .joystick-base { width: 120px; height: 120px; bottom: 20px; }
+            .joystick-knob { width: 35px; height: 35px; }
+        }
+
+        .selectable-card {
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        .selectable-card.active {
+            border-color: #3b82f6;
+            background-color: #eff6ff;
+            transform: scale(1.02);
+        }
+
+        #home-btn {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 25;
+            pointer-events: auto;
+            display: none;
+        }
+
+        #telemetry-overlay {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            z-index: 25;
+            pointer-events: none;
+            display: none;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .telemetry-bubble {
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            color: white;
+            padding: 3px 10px;
+            border-radius: 4px;
+            font-size: 10px; 
+            font-family: monospace;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 100px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        #launch-hint {
+            position: absolute;
+            top: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 15;
+            pointer-events: none;
+            display: none;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="canvas-container"></div>
+
+    <button id="home-btn" onclick="returnToMenu()" class="bg-gray-900/80 hover:bg-gray-900 text-white font-bold py-3 px-8 rounded-full shadow-2xl flex items-center transition-all border border-white/20 text-sm">
+        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+        結束飛行
+    </button>
+
+    <div id="telemetry-overlay">
+        <div class="telemetry-bubble"><span class="text-gray-400">DIST</span><span id="stat-dist" class="ml-auto">0.0 m</span></div>
+        <div class="telemetry-bubble"><span class="text-gray-400">ALT </span><span id="stat-height" class="ml-auto">0.0 m</span></div>
+        <div class="telemetry-bubble"><span class="text-gray-400">SPD </span><span id="stat-speed" class="ml-auto">0.0 km/h</span></div>
+    </div>
+
+    <div id="launch-hint" class="bg-black/40 backdrop-blur-sm text-white px-6 py-2 rounded-full font-bold text-lg animate-bounce">
+        推滿油門三秒後自動起飛
+    </div>
+
+    <!-- 開始功能表 -->
+    <div id="ui-overlay">
+        <div class="bg-white p-8 rounded-3xl shadow-2xl text-center max-w-lg w-full mx-4 border border-gray-100">
+            <h1 class="text-3xl font-black mb-8 text-gray-800 tracking-tight">MiniFly 模擬器</h1>
+            
+            <!-- 場景選擇 (移除標籤，高度減半) -->
+            <div class="mb-6">
+                <div class="grid grid-cols-2 gap-4">
+                    <div id="scene-outdoor" onclick="selectScene('outdoor')" class="selectable-card py-1.5 px-3 border-2 border-gray-100 rounded-xl font-bold text-gray-700 active">
+                        室外場景
+                    </div>
+                    <div id="scene-gym" onclick="selectScene('gym')" class="selectable-card py-1.5 px-3 border-2 border-gray-100 rounded-xl font-bold text-gray-700">
+                        活動中心
+                    </div>
+                </div>
+            </div>
+
+            <!-- 機型選擇 (移除標籤，高度減半) -->
+            <div class="mb-8">
+                <div class="space-y-3">
+                    <div class="grid grid-cols-3 gap-3">
+                        <button onclick="confirmFlight('https://raw.githubusercontent.com/kuoyichen/minifly/main/nakamura.glb', 'Nakamura')" class="py-1.5 px-2 border-2 border-gray-100 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all font-bold text-gray-700 text-sm">Nakamura</button>
+                        <button onclick="confirmFlight('https://raw.githubusercontent.com/kuoyichen/minifly/main/AeroBat.glb', 'AeroBat')" class="py-1.5 px-2 border-2 border-gray-100 rounded-xl hover:border-teal-500 hover:bg-teal-50 transition-all font-bold text-gray-700 text-sm">AeroBat</button>
+                        <button onclick="confirmFlight('https://raw.githubusercontent.com/kuoyichen/minifly/main/invader.glb', 'Invader')" class="py-1.5 px-2 border-2 border-gray-100 rounded-xl hover:border-red-500 hover:bg-red-50 transition-all font-bold text-gray-700 text-sm">Invader</button>
+                    </div>
+                    <div class="grid grid-cols-3 gap-3">
+                        <button onclick="confirmFlight('https://raw.githubusercontent.com/kuoyichen/minifly/main/3D_F-22.glb', '3D_F-22')" class="py-1.5 px-3 border-2 border-gray-100 rounded-xl hover:border-green-500 hover:bg-green-50 transition-all font-bold text-gray-700 text-sm">F-22</button>
+                        <button onclick="confirmFlight('https://raw.githubusercontent.com/kuoyichen/minifly/main/3D_Su-27.glb', '3D_Su-27')" class="py-1.5 px-3 border-2 border-gray-100 rounded-xl hover:border-purple-500 hover:bg-purple-50 transition-all font-bold text-gray-700 text-sm">Su-27</button>
+                        <button onclick="confirmFlight('https://raw.githubusercontent.com/kuoyichen/minifly/main/3D_F-14.glb', '3D_F-14')" class="py-1.5 px-3 border-2 border-gray-100 rounded-xl hover:border-orange-500 hover:bg-orange-50 transition-all font-bold text-gray-700 text-sm">F-14</button>
+                    </div>
+                </div>
+            </div>
+
+            <label class="cursor-pointer text-sm text-blue-600 hover:text-blue-800 font-medium inline-flex items-center">
+                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                載入本地 .glb
+                <input type="file" id="file-input" accept=".glb" class="hidden" />
+            </label>
+
+            <div id="loading-text" class="hidden mt-6 text-sm font-semibold text-blue-600 animate-pulse">正在載入飛行環境...</div>
+        </div>
+    </div>
+
+    <div id="controls-overlay">
+        <div id="joystick-left" class="joystick-base"><div id="knob-left" class="joystick-knob"></div></div>
+        <div id="joystick-right" class="joystick-base"><div id="knob-right" class="joystick-knob"></div></div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+
+    <script>
+        // --- 0. 全域狀態與初始化變數 ---
+        let activeScene = 'outdoor';
+        let airplane = null, modelContainer = null, leftPropeller = null, rightPropeller = null;
+        let throttleValue = 0, rudderValue = 0, currentSpeed = 0;
+        let isLaunched = false, launchTimer = 0, isCrashed = false, crashTimer = 0;
+        const clock = new THREE.Clock();
+
+        const UNIT_TO_METERS = 0.054; 
+        const INITIAL_Y = 1.8 / UNIT_TO_METERS; 
+        const GYM_SIZE = 1200;
+        const GYM_HEIGHT = 400;
+
+        // --- 1. 場景初始化 ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        const skyColor = new THREE.Color(0x87CEEB); 
+        scene.background = skyColor; 
+        scene.fog = new THREE.FogExp2(0x87CEEB, 0.00015);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 15000);
+        const statusCamera = new THREE.PerspectiveCamera(60, 4 / 3, 0.1, 5000); 
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.autoClear = false; 
+        renderer.outputEncoding = THREE.sRGBEncoding; 
+        renderer.toneMapping = THREE.ACESFilmicToneMapping; 
+        container.appendChild(renderer.domElement);
+
+        scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 0.7));
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+        dirLight.position.set(500, 1000, 200);
+        dirLight.castShadow = true;
+        scene.add(dirLight);
+
+        // --- 室外場景組件 ---
+        const outdoorGroup = new THREE.Group();
+        scene.add(outdoorGroup);
+
+        // 太陽
+        const sunGroup = new THREE.Group();
+        const sunGeo = new THREE.SphereGeometry(60, 32, 32);
+        const sunMesh = new THREE.Mesh(sunGeo, new THREE.MeshBasicMaterial({ color: 0xffffcc }));
+        sunGroup.add(sunMesh);
+        const sunCanvas = document.createElement('canvas');
+        sunCanvas.width = 128; sunCanvas.height = 128;
+        const sCtx = sunCanvas.getContext('2d');
+        const sGrad = sCtx.createRadialGradient(64, 64, 0, 64, 64, 64);
+        sGrad.addColorStop(0, 'rgba(255, 255, 200, 1)');
+        sGrad.addColorStop(1, 'rgba(255, 255, 0, 0)');
+        sCtx.fillStyle = sGrad; sCtx.fillRect(0, 0, 128, 128);
+        const sunSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(sunCanvas), transparent: true }));
+        sunSprite.scale.set(400, 400, 1);
+        sunGroup.add(sunSprite);
+        sunGroup.position.set(4000, 2300, -2000);
+        outdoorGroup.add(sunGroup);
+
+        // 室外地形
+        function createTerrainTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512; canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+            const gridSize = 8; const cellSize = 64;
+            const greens = ['#4F7942', '#556B2F', '#6B8E23', '#7CB342'];
+            const browns = ['#8B5A2B', '#A0522D', '#CD853F', '#D2B48C'];
+            for(let i=0; i<gridSize; i++) {
+                for(let j=0; j<gridSize; j++) {
+                    ctx.fillStyle = Math.random() > 0.3 ? greens[Math.floor(Math.random()*4)] : browns[Math.floor(Math.random()*4)];
+                    ctx.fillRect(i*cellSize, j*cellSize, cellSize, cellSize);
+                    ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 2; ctx.strokeRect(i*cellSize, j*cellSize, cellSize, cellSize);
+                }
+            }
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(16, 16);
+            return tex;
+        }
+
+        function getTerrainHeight(x, z) {
+            if (activeScene === 'gym') return 0;
+            const dist = Math.sqrt(x*x + z*z);
+            if (dist <= 150) return 0; 
+            let h = (Math.sin(x / 400) + Math.cos(z / 400)) * 15;
+            h += (Math.sin(x / 150) + Math.cos(z / 150)) * 5;
+            return h * Math.min(1, (dist - 150) / 200);
+        }
+
+        const groundGeo = new THREE.PlaneGeometry(12000, 12000, 60, 60);
+        groundGeo.rotateX(-Math.PI / 2);
+        const groundPos = groundGeo.attributes.position;
+        for (let i = 0; i < groundPos.count; i++) {
+            groundPos.setY(i, getTerrainHeight(groundPos.getX(i), groundPos.getZ(i)));
+        }
+        groundGeo.computeVertexNormals();
+        const groundMesh = new THREE.Mesh(groundGeo, new THREE.MeshLambertMaterial({ map: createTerrainTexture() }));
+        groundMesh.receiveShadow = true;
+        outdoorGroup.add(groundMesh);
+
+        // 雲朵
+        const cloudCanvas = document.createElement('canvas');
+        cloudCanvas.width = 128; cloudCanvas.height = 128;
+        const cCtx = cloudCanvas.getContext('2d');
+        const cGrad = cCtx.createRadialGradient(64,64,0,64,64,64);
+        cGrad.addColorStop(0, 'rgba(255,255,255,0.8)'); cGrad.addColorStop(1, 'rgba(255,255,255,0)');
+        cCtx.fillStyle = cGrad; cCtx.fillRect(0,0,128,128);
+        const cloudMat = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cloudCanvas), transparent: true, depthWrite: false, side: THREE.DoubleSide, opacity: 0.6 });
+        for (let i = 0; i < 100; i++) {
+            const size = 300 + Math.random() * 500;
+            const cloud = new THREE.Mesh(new THREE.PlaneGeometry(size, size * 0.5), cloudMat);
+            const angle = Math.random() * Math.PI * 2; const dist = 500 + Math.random() * 5000;
+            cloud.position.set(Math.cos(angle)*dist, 500 + Math.random()*800, Math.sin(angle)*dist);
+            cloud.rotation.x = -Math.PI/2; cloud.rotation.z = Math.random()*Math.PI*2;
+            outdoorGroup.add(cloud);
+        }
+
+        // --- 活動中心場景組件 ---
+        const gymGroup = new THREE.Group();
+        scene.add(gymGroup);
+
+        // 灰色格線地板
+        const floorCanvas = document.createElement('canvas');
+        floorCanvas.width = 256; floorCanvas.height = 256;
+        const fCtx = floorCanvas.getContext('2d');
+        fCtx.fillStyle = '#cccccc'; fCtx.fillRect(0,0,256,256);
+        fCtx.strokeStyle = '#999999'; fCtx.lineWidth = 4; fCtx.strokeRect(0,0,256,256);
+        const floorTex = new THREE.CanvasTexture(floorCanvas);
+        floorTex.wrapS = floorTex.wrapT = THREE.RepeatWrapping; floorTex.repeat.set(10, 10);
+        const gymFloor = new THREE.Mesh(new THREE.PlaneGeometry(GYM_SIZE, GYM_SIZE), new THREE.MeshLambertMaterial({ map: floorTex }));
+        gymFloor.rotateX(-Math.PI/2);
+        gymGroup.add(gymFloor);
+
+        // 黃色屋頂
+        const gymRoof = new THREE.Mesh(new THREE.PlaneGeometry(GYM_SIZE, GYM_SIZE), new THREE.MeshLambertMaterial({ color: 0xffd700 }));
+        gymRoof.position.y = GYM_HEIGHT; gymRoof.rotateX(Math.PI/2);
+        gymGroup.add(gymRoof);
+
+        // 牆壁 (帶細長窗戶)
+        function createGymWall(width, height) {
+            const wall = new THREE.Group();
+            const wallMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+            
+            // 下半部牆壁 (0~80)
+            const bottom = new THREE.Mesh(new THREE.BoxGeometry(width, 80, 5), wallMat);
+            bottom.position.y = 40;
+            wall.add(bottom);
+            
+            // 上半部牆壁 (250~400)
+            const top = new THREE.Mesh(new THREE.BoxGeometry(width, 150, 5), wallMat);
+            top.position.y = 325;
+            wall.add(top);
+            
+            const pillarCount = 8;
+            const pillarWidth = 95; 
+            const spacing = width / pillarCount;
+            for(let i=0; i<=pillarCount; i++) {
+                const pillar = new THREE.Mesh(new THREE.BoxGeometry(pillarWidth, 170, 5), wallMat);
+                pillar.position.set(-width/2 + i*spacing, 165, 0);
+                wall.add(pillar);
+            }
+            return wall;
+        }
+
+        const wallFront = createGymWall(GYM_SIZE, GYM_HEIGHT); wallFront.position.set(0, 0, -GYM_SIZE/2); gymGroup.add(wallFront);
+        const wallBack = createGymWall(GYM_SIZE, GYM_HEIGHT); wallBack.position.set(0, 0, GYM_SIZE/2); gymGroup.add(wallBack);
+        const wallLeft = createGymWall(GYM_SIZE, GYM_HEIGHT); wallLeft.position.set(-GYM_SIZE/2, 0, 0); wallLeft.rotateY(Math.PI/2); gymGroup.add(wallLeft);
+        const wallRight = createGymWall(GYM_SIZE, GYM_HEIGHT); wallRight.position.set(GYM_SIZE/2, 0, 0); wallRight.rotateY(Math.PI/2); gymGroup.add(wallRight);
+
+        // --- 狀態管理函數 ---
+        function selectScene(type) {
+            activeScene = type;
+            document.getElementById('scene-outdoor').classList.toggle('active', type === 'outdoor');
+            document.getElementById('scene-gym').classList.toggle('active', type === 'gym');
+            outdoorGroup.visible = (type === 'outdoor');
+            gymGroup.visible = (type === 'gym');
+            scene.fog.density = (type === 'outdoor' ? 0.00015 : 0); 
+        }
+        selectScene('outdoor'); 
+
+        function returnToMenu() {
+            document.getElementById('ui-overlay').style.display = 'flex';
+            document.getElementById('controls-overlay').style.display = 'none';
+            document.getElementById('home-btn').style.display = 'none';
+            document.getElementById('telemetry-overlay').style.display = 'none';
+            document.getElementById('launch-hint').style.display = 'none';
+            isLaunched = false; currentSpeed = 0; isCrashed = false; throttleValue = 0; rudderValue = 0;
+            document.getElementById('knob-left').style.top = '100%';
+            document.getElementById('knob-right').style.left = '50%';
+            if (airplane) {
+                airplane.position.set(0, INITIAL_Y, -10);
+                airplane.rotation.set(0, 0, 0);
+                modelContainer.rotation.set(0, 0, 0);
+            }
+        }
+
+        function confirmFlight(url, name) {
+            initAudio();
+            document.getElementById('loading-text').classList.remove('hidden');
+            processModel(url, name);
+        }
+
+        function processModel(url, filename, isBlob = false) {
+            new THREE.GLTFLoader().load(url, (gltf) => {
+                if (airplane) scene.remove(airplane);
+                const model = gltf.scene;
+                airplane = new THREE.Group(); modelContainer = new THREE.Group();
+                const box = new THREE.Box3().setFromObject(model);
+                const size = box.getSize(new THREE.Vector3()).length();
+                const center = box.getCenter(new THREE.Vector3());
+                const scale = 10 / size;
+                model.scale.set(scale, scale, scale);
+                model.position.set(-center.x * scale, -center.y * scale, -center.z * scale);
+                modelContainer.add(model);
+                
+                const propGeo = new THREE.BoxGeometry(1.5, 0.1, 0.05);
+                leftPropeller = new THREE.Mesh(propGeo, new THREE.MeshBasicMaterial({ color: 0x222222 }));
+                rightPropeller = new THREE.Mesh(propGeo, new THREE.MeshBasicMaterial({ color: 0x222222 }));
+                
+                let propZ = 4.25, propY = 0.5;
+                const lowName = filename.toLowerCase();
+                if (lowName.includes('invader')) propZ = 3.7;
+                else if (lowName.includes('3d_f-14')) { propZ = 3.7; propY = -0.25; }
+                else if (lowName.startsWith('3d_')) { propZ = 4.0; propY = -0.25; }
+                else if (lowName.includes('aerobat')) { propY = 0.3 } // 針對 AeroBat 將螺旋槳高度往下調
+                
+                leftPropeller.position.set(-0.8, propY, propZ);
+                rightPropeller.position.set(0.8, propY, propZ);
+                modelContainer.add(leftPropeller, rightPropeller);
+                airplane.add(modelContainer);
+                airplane.position.set(0, INITIAL_Y, -10);
+                scene.add(airplane);
+                
+                camera.position.set(0, INITIAL_Y, 0);
+                if (isBlob) URL.revokeObjectURL(url);
+                document.getElementById('ui-overlay').style.display = 'none';
+                document.getElementById('controls-overlay').style.display = 'block';
+                document.getElementById('home-btn').style.display = 'flex';
+                document.getElementById('telemetry-overlay').style.display = 'flex';
+                document.getElementById('launch-hint').style.display = 'block';
+                document.getElementById('loading-text').classList.add('hidden');
+            });
+        }
+
+        let audioCtx = null, lGain, rGain, lOsc, rOsc;
+        function initAudio() {
+            if (audioCtx) return;
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const setupMotor = () => {
+                const osc = audioCtx.createOscillator(); osc.type = 'sawtooth';
+                const gain = audioCtx.createGain(); gain.gain.value = 0;
+                const filter = audioCtx.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 800;
+                osc.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
+                osc.start(); return { osc, gain };
+            };
+            const l = setupMotor(); lOsc = l.osc; lGain = l.gain;
+            const r = setupMotor(); rOsc = r.osc; rGain = r.gain;
+        }
+
+        document.getElementById('file-input').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                initAudio();
+                document.getElementById('loading-text').classList.remove('hidden');
+                const url = URL.createObjectURL(file);
+                processModel(url, file.name, true);
+                e.target.value = ''; // 允許重複載入相同的檔案
+            }
+        });
+
+        const handlePointer = (base, knob, isV, cb) => {
+            let pid = null;
+            const up = (e) => {
+                const r = base.getBoundingClientRect(); const p = knob.offsetHeight/2;
+                if (isV) { let y = Math.max(p, Math.min(e.clientY-r.top, r.height-p)); knob.style.top=y+'px'; cb(1-(y-p)/(r.height-p*2)); }
+                else { let x = Math.max(p, Math.min(e.clientX-r.left, r.width-p)); knob.style.left=x+'px'; cb(((x-p)/(r.width-p*2))*2-1); }
+            };
+            base.addEventListener('pointerdown', (e)=>{ pid=e.pointerId; base.setPointerCapture(pid); up(e); });
+            base.addEventListener('pointermove', (e)=>{ if(pid===e.pointerId) up(e); });
+            base.addEventListener('pointerup', (e)=>{ if(pid===e.pointerId){ base.releasePointerCapture(pid); pid=null; if(!isV){ knob.style.left='50%'; cb(0); }}});
+        };
+        handlePointer(document.getElementById('joystick-left'), document.getElementById('knob-left'), true, v=>throttleValue=v);
+        handlePointer(document.getElementById('joystick-right'), document.getElementById('knob-right'), false, v=>rudderValue=v);
+
+        function animate() {
+            requestAnimationFrame(animate);
+            let dt = clock.getDelta();
+            
+            // 限制最大 dt，避免切換分頁或嚴重卡頓時發生瞬間大跳躍
+            dt = Math.min(dt, 0.1); 
+            // 建立一個時間縮放係數 (以 60FPS 約 0.0166秒 為基準 1.0)
+            const timeScale = dt * 60; 
+
+            if (airplane && modelContainer) {
+                if (isCrashed) {
+                    crashTimer += dt;
+                    if (crashTimer >= 2.0) {
+                        isCrashed = false; crashTimer = 0; isLaunched = false; currentSpeed = 0;
+                        airplane.position.set(0, INITIAL_Y, -10); airplane.rotation.set(0,0,0); modelContainer.rotation.set(0,0,0);
+                        document.getElementById('launch-hint').style.display = 'block';
+                    }
+                    if (lGain) { lGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1); rGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1); }
+                } else {
+                    // 修改處 1: 方向舵轉彎力道增加兩倍 (將 0.02 調整為 0.04)
+                    airplane.rotation.y -= rudderValue * (0.04 * throttleValue) * timeScale;
+                    // 修改處 2: 飛機轉彎的傾斜角增加兩倍 (將 0.2 調整為 0.4)
+                    modelContainer.rotation.z += (-rudderValue * 0.4 * throttleValue - modelContainer.rotation.z) * Math.min(1, 0.1 * timeScale);
+                    modelContainer.rotation.x += (((throttleValue-0.7)*1.5 - Math.abs(modelContainer.rotation.z)*0.6) - modelContainer.rotation.x) * Math.min(1, 0.1 * timeScale);
+
+                    const ls = Math.max(0, throttleValue + rudderValue*0.25*throttleValue);
+                    const rs = Math.max(0, throttleValue - rudderValue*0.25*throttleValue);
+                    leftPropeller.rotation.z += ls * 1.2 * timeScale; 
+                    rightPropeller.rotation.z -= rs * 1.2 * timeScale;
+
+                    // 根據轉速差異改變螺旋槳顏色 (轉速較快者變紅)
+                    if (ls > rs + 0.01) {
+                        leftPropeller.material.color.setHex(0xff0000);
+                        rightPropeller.material.color.setHex(0x222222);
+                    } else if (rs > ls + 0.01) {
+                        leftPropeller.material.color.setHex(0x222222);
+                        rightPropeller.material.color.setHex(0xff0000);
+                    } else {
+                        leftPropeller.material.color.setHex(0x222222);
+                        rightPropeller.material.color.setHex(0x222222);
+                    }
+
+                    if (audioCtx) {
+                        const att = 50 / (50 + airplane.position.distanceTo(camera.position));
+                        lGain.gain.setTargetAtTime((ls>0.05?ls*0.08:0)*att, audioCtx.currentTime, 0.1);
+                        rGain.gain.setTargetAtTime((rs>0.05?rs*0.08:0)*att, audioCtx.currentTime, 0.1);
+                        lOsc.frequency.setTargetAtTime(100+ls*300, audioCtx.currentTime, 0.1);
+                        rOsc.frequency.setTargetAtTime(100+rs*300, audioCtx.currentTime, 0.1);
+                    }
+
+                    if (!isLaunched) {
+                        if (throttleValue > 0.9) { launchTimer+=dt; if(launchTimer>3){ isLaunched=true; document.getElementById('launch-hint').style.display='none'; }}
+                        else launchTimer = 0;
+                    } else {
+                        currentSpeed += (0.53 + throttleValue - currentSpeed) * dt * 1.5;
+                        airplane.translateZ(-currentSpeed * Math.cos(modelContainer.rotation.x) * timeScale);
+                        airplane.position.y += currentSpeed * Math.sin(modelContainer.rotation.x) * timeScale;
+                    }
+
+                    let collided = false;
+                    const h = getTerrainHeight(airplane.position.x, airplane.position.z);
+                    if (airplane.position.y < h + 0.5) collided = true; 
+                    
+                    if (activeScene === 'gym') {
+                        if (airplane.position.y > GYM_HEIGHT - 2) collided = true; 
+                        if (Math.abs(airplane.position.x) > GYM_SIZE/2 - 5) collided = true; 
+                        if (Math.abs(airplane.position.z) > GYM_SIZE/2 - 5) collided = true; 
+                    }
+
+                    if (collided && isLaunched) isCrashed = true;
+                    if (collided) airplane.position.y = Math.max(airplane.position.y, h + 0.5);
+                }
+
+                const dist = airplane.position.distanceTo(new THREE.Vector3(0, INITIAL_Y, 0)) * UNIT_TO_METERS;
+                const alt = (airplane.position.y - getTerrainHeight(airplane.position.x, airplane.position.z)) * UNIT_TO_METERS;
+                const spd = currentSpeed * 60 * UNIT_TO_METERS * 3.6;
+                document.getElementById('stat-dist').innerText = (dist*3).toFixed(1) + ' m';
+                document.getElementById('stat-height').innerText = (alt*3).toFixed(1) + ' m';
+                document.getElementById('stat-speed').innerText = spd.toFixed(1) + ' km/h';
+
+                camera.lookAt(airplane.position);
+                let d = new THREE.Vector3().subVectors(airplane.position, camera.position).normalize();
+                statusCamera.position.copy(airplane.position).sub(d.multiplyScalar(20));
+                statusCamera.position.y += 2; statusCamera.lookAt(airplane.position);
+            }
+            renderer.setViewport(0,0,window.innerWidth, window.innerHeight); renderer.setScissor(0,0,window.innerWidth, window.innerHeight);
+            renderer.setScissorTest(true); renderer.clear(); renderer.render(scene, camera);
+            if (airplane) {
+                const w = Math.max(window.innerWidth*0.2, 150), h = w*0.75;
+                const x = window.innerWidth-w-20, y = window.innerHeight-h-20;
+                renderer.setViewport(x,y,w,h); renderer.setScissor(x,y,w,h); renderer.clearDepth(); renderer.render(scene, statusCamera);
+            }
+        }
+        window.addEventListener('resize', () => { camera.aspect=window.innerWidth/window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
+        animate();
+    </script>
+</body>
+</html>
