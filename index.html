@@ -245,48 +245,49 @@
     </div>
 
     <div id="ui-overlay">
-        <div class="bg-white p-8 rounded-3xl shadow-2xl text-center max-w-lg w-full mx-4 border border-gray-100">
-            <h1 class="text-3xl font-black mb-6 text-gray-800 tracking-tight">MiniFly 模擬器</h1>
+        <!-- 加入 max-h-[95vh] 與 overflow-y-auto 確保極限橫向螢幕可以滾動 -->
+        <div class="bg-white p-5 md:p-8 rounded-3xl shadow-2xl text-center max-w-lg w-full mx-4 border border-gray-100 max-h-[95vh] overflow-y-auto">
+            <h1 class="text-2xl sm:text-3xl font-black mb-5 sm:mb-6 text-gray-800 tracking-tight">MiniFly 模擬器</h1>
             
-            <!-- 飛行模式選擇 (新增) -->
-            <div class="mb-5">
-                <h3 class="text-sm font-bold text-gray-400 mb-2 text-left px-1">飛行模式</h3>
-                <div class="grid grid-cols-2 gap-4">
-                    <div id="mode-ideal" onclick="selectFlightMode('ideal')" class="selectable-card py-1.5 px-3 border-2 border-gray-100 rounded-xl font-bold text-gray-700 active">
+            <!-- 飛行模式選擇 -->
+            <div class="mb-4 flex flex-row items-center">
+                <h3 class="text-sm font-bold text-gray-400 text-left w-20 flex-shrink-0">飛行模式</h3>
+                <div class="flex-grow grid grid-cols-2 gap-2 sm:gap-3">
+                    <div id="mode-ideal" onclick="selectFlightMode('ideal')" class="selectable-card py-1.5 px-2 border-2 border-gray-100 rounded-xl font-bold text-gray-700 active text-sm">
                         理想模式
                     </div>
-                    <div id="mode-realistic" onclick="selectFlightMode('realistic')" class="selectable-card py-1.5 px-3 border-2 border-gray-100 rounded-xl font-bold text-gray-700">
-                        實際飛行模式
+                    <div id="mode-realistic" onclick="selectFlightMode('realistic')" class="selectable-card py-1.5 px-2 border-2 border-gray-100 rounded-xl font-bold text-gray-700 text-sm">
+                        實際飛行
                     </div>
                 </div>
             </div>
 
             <!-- 場景選擇 -->
-            <div class="mb-5">
-                <h3 class="text-sm font-bold text-gray-400 mb-2 text-left px-1">環境場景</h3>
-                <div class="grid grid-cols-2 gap-4">
-                    <div id="scene-outdoor" onclick="selectScene('outdoor')" class="selectable-card py-1.5 px-3 border-2 border-gray-100 rounded-xl font-bold text-gray-700 active">
+            <div class="mb-4 flex flex-row items-center">
+                <h3 class="text-sm font-bold text-gray-400 text-left w-20 flex-shrink-0">環境場景</h3>
+                <div class="flex-grow grid grid-cols-2 gap-2 sm:gap-3">
+                    <div id="scene-outdoor" onclick="selectScene('outdoor')" class="selectable-card py-1.5 px-2 border-2 border-gray-100 rounded-xl font-bold text-gray-700 active text-sm">
                         室外場景
                     </div>
-                    <div id="scene-gym" onclick="selectScene('gym')" class="selectable-card py-1.5 px-3 border-2 border-gray-100 rounded-xl font-bold text-gray-700">
+                    <div id="scene-gym" onclick="selectScene('gym')" class="selectable-card py-1.5 px-2 border-2 border-gray-100 rounded-xl font-bold text-gray-700 text-sm">
                         活動中心
                     </div>
                 </div>
             </div>
 
             <!-- 機型選擇 -->
-            <div class="mb-6">
-                <h3 class="text-sm font-bold text-gray-400 mb-2 text-left px-1">選擇機型</h3>
-                <div class="space-y-3">
-                    <div class="grid grid-cols-3 gap-3">
-                        <button onclick="confirmFlight('https://raw.githubusercontent.com/kuoyichen/minifly/main/nakamura.glb', 'Nakamura')" class="py-1.5 px-2 border-2 border-gray-100 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all font-bold text-gray-700 text-sm">Nakamura</button>
-                        <button onclick="confirmFlight('https://raw.githubusercontent.com/kuoyichen/minifly/main/AeroBat.glb', 'AeroBat')" class="py-1.5 px-2 border-2 border-gray-100 rounded-xl hover:border-teal-500 hover:bg-teal-50 transition-all font-bold text-gray-700 text-sm">AeroBat</button>
-                        <button onclick="confirmFlight('https://raw.githubusercontent.com/kuoyichen/minifly/main/invader.glb', 'Invader')" class="py-1.5 px-2 border-2 border-gray-100 rounded-xl hover:border-red-500 hover:bg-red-50 transition-all font-bold text-gray-700 text-sm">Invader</button>
+            <div class="mb-5 flex flex-row items-start">
+                <h3 class="text-sm font-bold text-gray-400 text-left w-20 flex-shrink-0 pt-1.5">選擇機型</h3>
+                <div class="flex-grow space-y-2">
+                    <div class="grid grid-cols-3 gap-2">
+                        <button onclick="confirmFlight('https://raw.githubusercontent.com/kuoyichen/minifly/main/nakamura.glb', 'Nakamura')" class="py-1.5 px-1 border-2 border-gray-100 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all font-bold text-gray-700 text-xs sm:text-sm">Nakamura</button>
+                        <button onclick="confirmFlight('https://raw.githubusercontent.com/kuoyichen/minifly/main/AeroBat.glb', 'AeroBat')" class="py-1.5 px-1 border-2 border-gray-100 rounded-xl hover:border-teal-500 hover:bg-teal-50 transition-all font-bold text-gray-700 text-xs sm:text-sm">AeroBat</button>
+                        <button onclick="confirmFlight('https://raw.githubusercontent.com/kuoyichen/minifly/main/invader.glb', 'Invader')" class="py-1.5 px-1 border-2 border-gray-100 rounded-xl hover:border-red-500 hover:bg-red-50 transition-all font-bold text-gray-700 text-xs sm:text-sm">Invader</button>
                     </div>
-                    <div class="grid grid-cols-3 gap-3">
-                        <button onclick="confirmFlight('https://raw.githubusercontent.com/kuoyichen/minifly/main/3D_F-22.glb', '3D_F-22')" class="py-1.5 px-3 border-2 border-gray-100 rounded-xl hover:border-green-500 hover:bg-green-50 transition-all font-bold text-gray-700 text-sm">F-22</button>
-                        <button onclick="confirmFlight('https://raw.githubusercontent.com/kuoyichen/minifly/main/3D_Su-27.glb', '3D_Su-27')" class="py-1.5 px-3 border-2 border-gray-100 rounded-xl hover:border-purple-500 hover:bg-purple-50 transition-all font-bold text-gray-700 text-sm">Su-27</button>
-                        <button onclick="confirmFlight('https://raw.githubusercontent.com/kuoyichen/minifly/main/3D_F-14.glb', '3D_F-14')" class="py-1.5 px-3 border-2 border-gray-100 rounded-xl hover:border-orange-500 hover:bg-orange-50 transition-all font-bold text-gray-700 text-sm">F-14</button>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button onclick="confirmFlight('https://raw.githubusercontent.com/kuoyichen/minifly/main/3D_F-22.glb', '3D_F-22')" class="py-1.5 px-1 border-2 border-gray-100 rounded-xl hover:border-green-500 hover:bg-green-50 transition-all font-bold text-gray-700 text-xs sm:text-sm">F-22</button>
+                        <button onclick="confirmFlight('https://raw.githubusercontent.com/kuoyichen/minifly/main/3D_Su-27.glb', '3D_Su-27')" class="py-1.5 px-1 border-2 border-gray-100 rounded-xl hover:border-purple-500 hover:bg-purple-50 transition-all font-bold text-gray-700 text-xs sm:text-sm">Su-27</button>
+                        <button onclick="confirmFlight('https://raw.githubusercontent.com/kuoyichen/minifly/main/3D_F-14.glb', '3D_F-14')" class="py-1.5 px-1 border-2 border-gray-100 rounded-xl hover:border-orange-500 hover:bg-orange-50 transition-all font-bold text-gray-700 text-xs sm:text-sm">F-14</button>
                     </div>
                 </div>
             </div>
@@ -297,7 +298,7 @@
                 <input type="file" id="file-input" accept=".glb" class="hidden" />
             </label>
 
-            <div id="loading-text" class="hidden mt-6 text-sm font-semibold text-blue-600 animate-pulse">正在載入飛行環境...</div>
+            <div id="loading-text" class="hidden mt-4 text-sm font-semibold text-blue-600 animate-pulse">正在載入飛行環境...</div>
         </div>
     </div>
 
