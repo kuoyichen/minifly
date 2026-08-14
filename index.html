@@ -49,7 +49,6 @@
 
         .joystick-base {
             position: absolute;
-            /* 修改處：將原本的 40px 提升 100px (150px 的 2/3) 變為 140px */
             bottom: 140px; 
             width: 150px;
             height: 150px;
@@ -76,7 +75,6 @@
         #knob-right { left: 50%; top: 50%; }
 
         @media (max-width: 800px) and (orientation: landscape) {
-            /* 修改處：將原本的 bottom: 20px 提升 80px (120px 的 2/3) 變為 100px */
             .joystick-base { width: 120px; height: 120px; bottom: 100px; }
             .joystick-knob { width: 35px; height: 35px; }
         }
@@ -101,9 +99,10 @@
             display: none;
         }
 
+        /* 調整遙測數據位置，為微調按鈕讓出空間 */
         #telemetry-overlay {
             position: absolute;
-            top: 15px;
+            top: 80px; 
             left: 15px;
             z-index: 25;
             pointer-events: none;
@@ -130,13 +129,99 @@
 
         #launch-hint {
             position: absolute;
-            top: 40px;
+            top: 140px;
             left: 50%;
             transform: translateX(-50%);
             z-index: 15;
             pointer-events: none;
             display: none;
             text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        /* 方向舵微調 UI 樣式 */
+        #trim-overlay {
+            position: absolute;
+            top: 15px;
+            left: 0;
+            width: 100vw;
+            height: 48px;
+            display: none;
+            z-index: 25;
+            pointer-events: none;
+        }
+
+        .trim-btn {
+            width: 48px;
+            height: 48px;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            color: white;
+            font-size: 20px;
+            font-weight: bold;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            pointer-events: auto;
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+        
+        .trim-btn:active {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .left-btn {
+            position: absolute;
+            left: 20vw;
+        }
+
+        .right-btn {
+            position: absolute;
+            right: 20vw;
+        }
+
+        #trim-display {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            top: 4px;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #4ade80; 
+            padding: 0 10px;
+            height: 40px;
+            border-radius: 20px;
+            font-size: 18px;
+            font-family: monospace;
+            font-weight: bold;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            pointer-events: auto;
+            white-space: nowrap; /* 確保箭頭過長時不會自動折行 */
+        }
+
+        /* 透過三等分區域固定數字位置，加大左右區域寬度 */
+        .trim-part-left {
+            width: 90px;
+            text-align: right;
+            padding-right: 8px;
+            box-sizing: border-box;
+        }
+
+        .trim-part-center {
+            width: 30px;
+            text-align: center;
+        }
+
+        .trim-part-right {
+            width: 90px;
+            text-align: left;
+            padding-left: 8px;
+            box-sizing: border-box;
         }
     </style>
 </head>
@@ -159,13 +244,26 @@
         推滿油門三秒後自動起飛
     </div>
 
-    <!-- 開始功能表 -->
     <div id="ui-overlay">
         <div class="bg-white p-8 rounded-3xl shadow-2xl text-center max-w-lg w-full mx-4 border border-gray-100">
-            <h1 class="text-3xl font-black mb-8 text-gray-800 tracking-tight">MiniFly 模擬器</h1>
+            <h1 class="text-3xl font-black mb-6 text-gray-800 tracking-tight">MiniFly 模擬器</h1>
             
+            <!-- 飛行模式選擇 (新增) -->
+            <div class="mb-5">
+                <h3 class="text-sm font-bold text-gray-400 mb-2 text-left px-1">飛行模式</h3>
+                <div class="grid grid-cols-2 gap-4">
+                    <div id="mode-ideal" onclick="selectFlightMode('ideal')" class="selectable-card py-1.5 px-3 border-2 border-gray-100 rounded-xl font-bold text-gray-700 active">
+                        理想模式
+                    </div>
+                    <div id="mode-realistic" onclick="selectFlightMode('realistic')" class="selectable-card py-1.5 px-3 border-2 border-gray-100 rounded-xl font-bold text-gray-700">
+                        實際飛行模式
+                    </div>
+                </div>
+            </div>
+
             <!-- 場景選擇 -->
-            <div class="mb-6">
+            <div class="mb-5">
+                <h3 class="text-sm font-bold text-gray-400 mb-2 text-left px-1">環境場景</h3>
                 <div class="grid grid-cols-2 gap-4">
                     <div id="scene-outdoor" onclick="selectScene('outdoor')" class="selectable-card py-1.5 px-3 border-2 border-gray-100 rounded-xl font-bold text-gray-700 active">
                         室外場景
@@ -177,7 +275,8 @@
             </div>
 
             <!-- 機型選擇 -->
-            <div class="mb-8">
+            <div class="mb-6">
+                <h3 class="text-sm font-bold text-gray-400 mb-2 text-left px-1">選擇機型</h3>
                 <div class="space-y-3">
                     <div class="grid grid-cols-3 gap-3">
                         <button onclick="confirmFlight('https://raw.githubusercontent.com/kuoyichen/minifly/main/nakamura.glb', 'Nakamura')" class="py-1.5 px-2 border-2 border-gray-100 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all font-bold text-gray-700 text-sm">Nakamura</button>
@@ -202,6 +301,20 @@
         </div>
     </div>
 
+    <!-- 方向舵微調控制層 (僅在實際飛行模式顯示) -->
+    <div id="trim-overlay">
+        <!-- 左微調按鈕 (向左箭頭) -->
+        <button class="trim-btn left-btn" onclick="adjustTrim(-1)">←</button>
+        <!-- 微調數值與方向指示 -->
+        <div id="trim-display">
+            <div class="trim-part-left"></div>
+            <div class="trim-part-center">5</div>
+            <div class="trim-part-right"></div>
+        </div>
+        <!-- 右微調按鈕 (向右箭頭) -->
+        <button class="trim-btn right-btn" onclick="adjustTrim(1)">→</button>
+    </div>
+
     <div id="controls-overlay">
         <div id="joystick-left" class="joystick-base"><div id="knob-left" class="joystick-knob"></div></div>
         <div id="joystick-right" class="joystick-base"><div id="knob-right" class="joystick-knob"></div></div>
@@ -213,6 +326,12 @@
     <script>
         // --- 0. 全域狀態與初始化變數 ---
         let activeScene = 'outdoor';
+        let currentMode = 'ideal'; // 預設為理想模式
+        
+        // 微調系統變數
+        let inherentRollBiasDeg = 0; // 飛機天生偏側角度 (亂數決定)
+        let currentTrim = 5;         // 當前微調值 (5 為中間)
+
         let airplane = null, modelContainer = null, leftPropeller = null, rightPropeller = null;
         let throttleValue = 0, rudderValue = 0, currentSpeed = 0;
         let isLaunched = false, launchTimer = 0, isCrashed = false, crashTimer = 0;
@@ -352,12 +471,10 @@
             const wall = new THREE.Group();
             const wallMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
             
-            // 下半部牆壁 (0~80)
             const bottom = new THREE.Mesh(new THREE.BoxGeometry(width, 80, 5), wallMat);
             bottom.position.y = 40;
             wall.add(bottom);
             
-            // 上半部牆壁 (250~400)
             const top = new THREE.Mesh(new THREE.BoxGeometry(width, 150, 5), wallMat);
             top.position.y = 325;
             wall.add(top);
@@ -389,12 +506,51 @@
         }
         selectScene('outdoor'); 
 
+        // 選擇飛行模式
+        function selectFlightMode(mode) {
+            currentMode = mode;
+            document.getElementById('mode-ideal').classList.toggle('active', mode === 'ideal');
+            document.getElementById('mode-realistic').classList.toggle('active', mode === 'realistic');
+        }
+
+        // 方向舵微調控制
+        function adjustTrim(delta) {
+            // 限制微調數值在 0 到 9 之間，5 為中間值
+            currentTrim = Math.max(0, Math.min(9, currentTrim + delta));
+            updateTrimDisplay();
+        }
+
+        // 更新微調顯示器
+        function updateTrimDisplay() {
+            const display = document.getElementById('trim-display');
+            let leftStr = '';
+            let rightStr = '';
+            
+            if (currentTrim > 5) {
+                // 數字大於 5 (按向右微調)，箭頭在數字右側朝右
+                const arrowLength = currentTrim - 5;
+                rightStr = '-'.repeat(arrowLength) + '>';
+            } else if (currentTrim < 5) {
+                // 數字小於 5 (按向左微調)，箭頭在數字左側朝左
+                const arrowLength = 5 - currentTrim;
+                leftStr = '<' + '-'.repeat(arrowLength);
+            }
+            
+            display.innerHTML = `
+                <div class="trim-part-left">${leftStr}</div>
+                <div class="trim-part-center">${currentTrim}</div>
+                <div class="trim-part-right">${rightStr}</div>
+            `;
+        }
+
         function returnToMenu() {
             document.getElementById('ui-overlay').style.display = 'flex';
             document.getElementById('controls-overlay').style.display = 'none';
             document.getElementById('home-btn').style.display = 'none';
             document.getElementById('telemetry-overlay').style.display = 'none';
             document.getElementById('launch-hint').style.display = 'none';
+            document.getElementById('trim-overlay').style.display = 'none'; // 隱藏微調介面
+            
             isLaunched = false; currentSpeed = 0; isCrashed = false; throttleValue = 0; rudderValue = 0;
             document.getElementById('knob-left').style.top = '100%';
             document.getElementById('knob-right').style.left = '50%';
@@ -408,6 +564,22 @@
         function confirmFlight(url, name) {
             initAudio();
             document.getElementById('loading-text').classList.remove('hidden');
+            
+            // 重置微調狀態
+            currentTrim = 5;
+            updateTrimDisplay();
+            
+            // 根據模式決定是否賦予天生的偏側亂數
+            if (currentMode === 'realistic') {
+                // 產生 1 到 4 度的隨機偏差
+                const magnitude = Math.floor(Math.random() * 4) + 1;
+                // 隨機決定向左 (負值) 或向右 (正值)
+                const isRightBias = Math.random() > 0.5;
+                inherentRollBiasDeg = isRightBias ? magnitude : -magnitude;
+            } else {
+                inherentRollBiasDeg = 0; // 理想模式不偏移
+            }
+
             processModel(url, name);
         }
 
@@ -433,7 +605,7 @@
                 if (lowName.includes('invader')) propZ = 3.7;
                 else if (lowName.includes('3d_f-14')) { propZ = 3.7; propY = -0.25; }
                 else if (lowName.startsWith('3d_')) { propZ = 4.0; propY = -0.25; }
-                else if (lowName.includes('aerobat')) { propY = 0.3 } // 針對 AeroBat 將螺旋槳高度往下調
+                else if (lowName.includes('aerobat')) { propY = 0.3 }
                 
                 leftPropeller.position.set(-0.8, propY, propZ);
                 rightPropeller.position.set(0.8, propY, propZ);
@@ -444,11 +616,19 @@
                 
                 camera.position.set(0, INITIAL_Y, 0);
                 if (isBlob) URL.revokeObjectURL(url);
+                
+                // 開啟飛行 UI
                 document.getElementById('ui-overlay').style.display = 'none';
                 document.getElementById('controls-overlay').style.display = 'block';
                 document.getElementById('home-btn').style.display = 'flex';
                 document.getElementById('telemetry-overlay').style.display = 'flex';
                 document.getElementById('launch-hint').style.display = 'block';
+                
+                // 如果是實際飛行模式，則顯示微調按鈕
+                if (currentMode === 'realistic') {
+                    document.getElementById('trim-overlay').style.display = 'block';
+                }
+
                 document.getElementById('loading-text').classList.add('hidden');
             });
         }
@@ -474,8 +654,19 @@
                 initAudio();
                 document.getElementById('loading-text').classList.remove('hidden');
                 const url = URL.createObjectURL(file);
+                
+                // 載入本地檔案前也重置微調偏側
+                currentTrim = 5;
+                updateTrimDisplay();
+                if (currentMode === 'realistic') {
+                    const magnitude = Math.floor(Math.random() * 4) + 1;
+                    inherentRollBiasDeg = (Math.random() > 0.5) ? magnitude : -magnitude;
+                } else {
+                    inherentRollBiasDeg = 0;
+                }
+
                 processModel(url, file.name, true);
-                e.target.value = ''; // 允許重複載入相同的檔案
+                e.target.value = ''; 
             }
         });
 
@@ -497,9 +688,7 @@
             requestAnimationFrame(animate);
             let dt = clock.getDelta();
             
-            // 限制最大 dt，避免切換分頁或嚴重卡頓時發生瞬間大跳躍
             dt = Math.min(dt, 0.1); 
-            // 建立一個時間縮放係數 (以 60FPS 約 0.0166秒 為基準 1.0)
             const timeScale = dt * 60; 
 
             if (airplane && modelContainer) {
@@ -509,21 +698,42 @@
                         isCrashed = false; crashTimer = 0; isLaunched = false; currentSpeed = 0;
                         airplane.position.set(0, INITIAL_Y, -10); airplane.rotation.set(0,0,0); modelContainer.rotation.set(0,0,0);
                         document.getElementById('launch-hint').style.display = 'block';
+                        
+                        currentTrim = 5;
+                        updateTrimDisplay();
+                        if (currentMode === 'realistic') {
+                            const magnitude = Math.floor(Math.random() * 4) + 1;
+                            inherentRollBiasDeg = Math.random() > 0.5 ? magnitude : -magnitude;
+                        } else {
+                            inherentRollBiasDeg = 0;
+                        }
                     }
                     if (lGain) { lGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1); rGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1); }
                 } else {
-                    // 修改處 1: 方向舵轉彎力道增加兩倍 (將 0.02 調整為 0.04)
-                    airplane.rotation.y -= rudderValue * (0.04 * throttleValue) * timeScale;
-                    // 修改處 2: 飛機轉彎的傾斜角增加兩倍 (將 0.2 調整為 0.4)
-                    modelContainer.rotation.z += (-rudderValue * 0.4 * throttleValue - modelContainer.rotation.z) * Math.min(1, 0.1 * timeScale);
+                    
+                    // --- 實際飛行模式：計算偏差與微調影響 ---
+                    let totalRudderValue = rudderValue;
+                    
+                    if (currentMode === 'realistic' && isLaunched) {
+                        // 飛機天生偏移度數 + 玩家微調按鈕抵銷的度數 (5 是中間值，所以扣除 5)
+                        // 若 activeBias 大於 0，飛機會持續往右滾轉；小於 0 則往左。
+                        const activeBiasDeg = inherentRollBiasDeg + (currentTrim - 5);
+                        
+                        // 將角度偏差轉換為類似搖桿輸出的持續力量 (每度給予些微的推力)
+                        const biasRudderForce = activeBiasDeg * 0.05; 
+                        totalRudderValue += biasRudderForce;
+                    }
+
+                    // 使用包含偏移量與微調量的 totalRudderValue 來控制轉向與滾轉
+                    airplane.rotation.y -= totalRudderValue * (0.04 * throttleValue) * timeScale;
+                    modelContainer.rotation.z += (-totalRudderValue * 0.4 * throttleValue - modelContainer.rotation.z) * Math.min(1, 0.1 * timeScale);
                     modelContainer.rotation.x += (((throttleValue-0.7)*1.5 - Math.abs(modelContainer.rotation.z)*0.6) - modelContainer.rotation.x) * Math.min(1, 0.1 * timeScale);
 
-                    const ls = Math.max(0, throttleValue + rudderValue*0.25*throttleValue);
-                    const rs = Math.max(0, throttleValue - rudderValue*0.25*throttleValue);
+                    const ls = Math.max(0, throttleValue + totalRudderValue*0.25*throttleValue);
+                    const rs = Math.max(0, throttleValue - totalRudderValue*0.25*throttleValue);
                     leftPropeller.rotation.z += ls * 1.2 * timeScale; 
                     rightPropeller.rotation.z -= rs * 1.2 * timeScale;
 
-                    // 根據轉速差異改變螺旋槳顏色 (轉速較快者變紅)
                     if (ls > rs + 0.01) {
                         leftPropeller.material.color.setHex(0xff0000);
                         rightPropeller.material.color.setHex(0x222222);
