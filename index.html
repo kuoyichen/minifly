@@ -302,6 +302,38 @@
         let activeScene = 'outdoor';
         let currentMode = 'ideal'; 
         
+        // 跨瀏覽器全螢幕處理函數
+        async function enterFS() {
+            const elem = document.documentElement;
+            try {
+                if (elem.requestFullscreen) {
+                    await elem.requestFullscreen();
+                } else if (elem.webkitRequestFullscreen) { /* Safari / 手機版 Chrome */
+                    await elem.webkitRequestFullscreen();
+                } else if (elem.msRequestFullscreen) { /* IE11 */
+                    await elem.msRequestFullscreen();
+                }
+            } catch (e) {
+                console.warn("Fullscreen request blocked", e);
+            }
+        }
+
+        async function exitFS() {
+            try {
+                if (document.fullscreenElement || document.webkitFullscreenElement) {
+                    if (document.exitFullscreen) {
+                        await document.exitFullscreen();
+                    } else if (document.webkitExitFullscreen) {
+                        await document.webkitExitFullscreen();
+                    } else if (document.msExitFullscreen) {
+                        await document.msExitFullscreen();
+                    }
+                }
+            } catch (e) {
+                console.warn("Exit fullscreen failed", e);
+            }
+        }
+
         let inherentRollBiasDeg = 0; 
         let currentTrim = 5;         
 
@@ -501,14 +533,8 @@
         }
 
         async function returnToMenu() {
-            // 嘗試退出全螢幕
-            try {
-                if (document.fullscreenElement) {
-                    await document.exitFullscreen();
-                }
-            } catch (e) {
-                // 瀏覽器拒絕時忽略錯誤
-            }
+            // 嘗試退出全螢幕 (跨瀏覽器支援)
+            await exitFS();
 
             document.getElementById('ui-overlay').style.display = 'flex';
             document.getElementById('controls-overlay').style.display = 'none';
@@ -528,14 +554,8 @@
         }
 
         async function confirmFlight(url, name) {
-            // 嘗試進入全螢幕
-            try {
-                if (!document.fullscreenElement) {
-                    await document.documentElement.requestFullscreen();
-                }
-            } catch (e) {
-                // Chrome 拒絕全螢幕時繼續使用一般畫面
-            }
+            // 嘗試進入全螢幕 (跨瀏覽器支援)
+            await enterFS();
 
             initAudio();
             document.getElementById('loading-text').classList.remove('hidden');
@@ -620,14 +640,8 @@
         document.getElementById('file-input').addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (file) {
-                // 嘗試進入全螢幕 (本地載入時同樣觸發)
-                try {
-                    if (!document.fullscreenElement) {
-                        await document.documentElement.requestFullscreen();
-                    }
-                } catch (err) {
-                    // Chrome 拒絕全螢幕時繼續使用一般畫面
-                }
+                // 嘗試進入全螢幕 (跨瀏覽器支援)
+                await enterFS();
 
                 initAudio();
                 document.getElementById('loading-text').classList.remove('hidden');
